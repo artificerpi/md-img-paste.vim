@@ -1,3 +1,14 @@
+" TODO
+" permission write check, overwrite warning
+"
+
+function! s:PrintError(msg) abort
+    execute 'normal! \<Esc>'
+    echohl ErrorMsg
+    echomsg a:msg
+    echohl None
+endfunction
+
 " https://stackoverflow.com/questions/57014805/check-if-using-windows-console-in-vim-while-in-windows-subsystem-for-linux
 function! s:IsWSL()
     if has("unix")
@@ -13,11 +24,12 @@ function! s:SafeMakeDir()
     if !exists('g:mdip_imgdir_absolute')
         if s:os == "Windows"  
             let outdir = expand('%:p:h') . '\' . g:mdip_imgdir
-    else
+        else
             let outdir = expand('%:p:h') . '/' . g:mdip_imgdir
         endif
     else 
-	let outdir = g:mdip_imgdir
+       " let outdir = g:mdip_imgdir
+       let outdir = g:mdip_imgdir . '/' . expand('%:p:h:t') . '-' . expand('%:t:r')
     endif
     if !isdirectory(outdir)
         call mkdir(outdir)
@@ -51,7 +63,10 @@ function! s:SaveFileTMPLinux(imgdir, tmpname) abort
     let targets = filter(
                 \ systemlist('xclip -selection clipboard -t TARGETS -o'),
                 \ 'v:val =~# ''image/''')
-    if empty(targets) | return 1 | endif
+    if empty(targets)
+        call s:PrintError("No image found in clipboard")
+        return 1
+    endif
 
     if index(targets, "image/png") >= 0
         " Use PNG if available
@@ -150,7 +165,7 @@ endfunction
 
 function! s:InputName()
     call inputsave()
-    let name = input('Image name: ')
+    let name = input('Image name: ', 'default-name')
     call inputrestore()
     return name
 endfunction
@@ -164,10 +179,10 @@ function! mdip#MarkdownClipboardImage()
 
     let workdir = s:SafeMakeDir()
     " change temp-file-name and image-name
-    let g:mdip_tmpname = s:InputName()
-    if empty(g:mdip_tmpname)
+    "let g:mdip_tmpname = s:InputName()
+    "if empty(g:mdip_tmpname)
       let g:mdip_tmpname = g:mdip_imgname . '_' . s:RandomName()
-    endif
+    "endif
 
     let tmpfile = s:SaveFileTMP(workdir, g:mdip_tmpname)
     if tmpfile == 1
@@ -175,7 +190,7 @@ function! mdip#MarkdownClipboardImage()
     else
         " let relpath = s:SaveNewFile(g:mdip_imgdir, tmpfile)
         let extension = split(tmpfile, '\.')[-1]
-        let relpath = g:mdip_imgdir_intext . '/' . g:mdip_tmpname . '.' . extension
+        let relpath = workdir . '/' . g:mdip_tmpname . '.' . extension
         execute "normal! i![I"
         let ipos = getcurpos()
         execute "normal! amage](" . relpath . ")"
@@ -201,3 +216,4 @@ endif
 if !exists('g:mdip_imgname')
     let g:mdip_imgname = 'image'
 endif
+
